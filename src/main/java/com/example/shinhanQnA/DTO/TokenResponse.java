@@ -1,14 +1,12 @@
 package com.example.shinhanQnA.DTO;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
 
+@Data
 @AllArgsConstructor
-@Getter
 public class TokenResponse {
-    private String accessToken;      // 서버(JWT)
-    private String refreshToken;     // 서버(JWT)
-    private String oauthAccessToken; // 필요하면 소셜 제공자 액세스 토큰
-    private String oauthRefreshToken;// 필요하면 소셜 제공자 리프레시 토큰
+    private String access_token;   // 서버 JWT Access Token
+    private String refresh_token;  // 서버 JWT Refresh Token
+    private int expires_in;        // Access Token 만료 시간(초)
 }
-

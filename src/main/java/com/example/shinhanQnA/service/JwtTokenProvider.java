@@ -1,30 +1,26 @@
 package com.example.shinhanQnA.service;
 
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
 import java.security.Key;
 import java.util.Date;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Component
 public class JwtTokenProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
 
-
     private final String secretKey;
     private final Key key;
 
-    private final long accessTokenValidTime = 1000L * 60 * 30;
-    private final long refreshTokenValidTime = 1000L * 60 * 60 * 24 * 7;
+    private final long accessTokenValidTime = 1000L * 60 * 30;  // 30분
+    private final long refreshTokenValidTime = 1000L * 60 * 60 * 24 * 7;  // 7일
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
         this.secretKey = secretKey;
@@ -49,6 +45,10 @@ public class JwtTokenProvider {
                 .compact();
         logger.info("생성된 RefreshToken: {} (userId: {})", token, userId);
         return token;
+    }
+
+    public int getAccessTokenValidTimeSeconds() {
+        return (int)(accessTokenValidTime / 1000L);
     }
 
     public boolean validateToken(String token) {
