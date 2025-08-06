@@ -4,7 +4,6 @@ import com.example.shinhanQnA.DTO.TokenResponse;
 import com.example.shinhanQnA.DTO.OauthUserInfo;
 import com.example.shinhanQnA.service.JwtTokenProvider;
 import com.example.shinhanQnA.service.OauthService;
-import com.example.shinhanQnA.service.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,7 @@ public class OauthController {
 
     private final Map<String, OauthService> oauthServiceMap;
     private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+
 
     @PostMapping("/oauth/callback/{provider}")
     public ResponseEntity<?> socialCallback(
@@ -46,10 +45,18 @@ public class OauthController {
                         .body(Map.of("error", "이름 없음"));
             }
 
-            String accessToken = jwtTokenProvider.createAccessToken(userInfo.getOauthId());
-            String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getOauthId());
+//            String accessToken = jwtTokenProvider.createAccessToken(userInfo.getOauthId());
+//            String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getOauthId());
+//
+//            refreshTokenRepository.save(userInfo.getOauthId(), refreshToken);
+            if (userInfo.getEmail() == null) {
+                throw new RuntimeException("이메일 정보가 없습니다");
+            }
 
-            refreshTokenRepository.save(userInfo.getOauthId(), refreshToken);
+            String accessToken = jwtTokenProvider.createAccessToken(userInfo.getEmail());
+            String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getEmail());
+            //refreshTokenRepository.save(userInfo.getEmail(), refreshToken);
+
 
             int expiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
 

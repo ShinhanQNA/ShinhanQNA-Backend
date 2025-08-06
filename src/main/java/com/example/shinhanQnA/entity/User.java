@@ -28,13 +28,14 @@ public class User {
     private String year;
 
     @Column(name = "Department")
-    private Integer department;
+    private String department;
 
-    @Column(name = "studentCardImagePath", length = 255)
+    @Column(name = "student_card_image_path", length = 255)
     private String studentCardImagePath;
 
-    @Column(name = "Field", length = 255)
-    private String field;
+    @Column(name = "Students", length = 255) // 혹은 적절한 컬럼명과 타입
+    private String students;
 
-    // 필요 시 toString, equals, hashCode 등 추가
+
+
 }
