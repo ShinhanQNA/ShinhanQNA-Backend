@@ -1,6 +1,8 @@
 package com.example.shinhanQnA.service;
 
 import com.example.shinhanQnA.DTO.OauthUserInfo;
+import com.example.shinhanQnA.entity.User;
+import com.example.shinhanQnA.repository.UserRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +18,7 @@ public class KakaoOauthService implements OauthService {
 
     private final RestTemplate restTemplate;
     private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
 
     @Value("${spring.security.oauth2.client.registration.kakao.client-id}")
     private String clientId;
@@ -39,21 +41,47 @@ public class KakaoOauthService implements OauthService {
         KakaoUserResponse kakaoUser = requestKakaoUserInfo(kakaoToken.getAccessToken());
 
         // 3. 서버 JWT 발급 및 리프레시 토큰 저장 (필요 시 다른 계층에서 처리 가능)
-        String userIdStr = String.valueOf(kakaoUser.getId());
 
-        String serverAccessToken = jwtTokenProvider.createAccessToken(userIdStr);
-        String serverRefreshToken = jwtTokenProvider.createRefreshToken(userIdStr);
 
-        refreshTokenRepository.save(userIdStr, serverRefreshToken);
+        String email = kakaoUser.getKakaoAccount() != null ? kakaoUser.getKakaoAccount().getEmail() : null;
+        if (email == null) {
+            throw new RuntimeException("이메일 정보가 없습니다");
+        }
+        String serverAccessToken = jwtTokenProvider.createAccessToken(email);
+        String serverRefreshToken = jwtTokenProvider.createRefreshToken(email);
+        String nickname = (kakaoUser.getKakaoAccount() != null && kakaoUser.getKakaoAccount().getProfile() != null)
+                ? kakaoUser.getKakaoAccount().getProfile().getNickname()
+                : "Unknown";
 
-        // 4. OauthUserInfo 변환하여 반환
+
+        userRepository.findByEmail(email)
+                .map(user -> {
+                    // 기존 사용자 토큰 업데이트 및 이름 업데이트
+                    user.setToken(serverRefreshToken);
+                    user.setName(nickname);
+                    return userRepository.save(user);
+                })
+                .orElseGet(() -> {
+                    // 신규 사용자 생성 및 리프레시 토큰 저장
+                    User newUser = User.builder()
+                            .email(email)
+                            .name(nickname)
+                            .token(serverRefreshToken)
+                            .build();
+                    return userRepository.save(newUser);
+                });
+
+
         return new OauthUserInfo(
                 "kakao",
-                userIdStr,
-                kakaoUser.getKakaoAccount() != null ? kakaoUser.getKakaoAccount().getEmail() : null,
+                String.valueOf(kakaoUser.getId()), // oauthId는 고유ID 유지
+                email,
                 (kakaoUser.getKakaoAccount() != null && kakaoUser.getKakaoAccount().getProfile() != null)
                         ? kakaoUser.getKakaoAccount().getProfile().getNickname() : null
         );
+
+
+
     }
 
     private KakaoTokenResponse requestKakaoToken(String code) {

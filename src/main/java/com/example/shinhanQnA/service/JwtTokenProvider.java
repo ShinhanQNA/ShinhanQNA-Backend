@@ -60,12 +60,12 @@ public class JwtTokenProvider {
         }
     }
 
-    public String getUserIdFromToken(String token) {
+    public String getEmailFromToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody()
-                .getSubject();
+                .getSubject();  // 토큰 subject가 이메일이라고 가정
     }
 }

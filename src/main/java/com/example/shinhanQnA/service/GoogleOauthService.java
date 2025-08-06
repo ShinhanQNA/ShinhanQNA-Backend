@@ -1,6 +1,8 @@
 package com.example.shinhanQnA.service;
 
 import com.example.shinhanQnA.DTO.OauthUserInfo;
+import com.example.shinhanQnA.entity.User;
+import com.example.shinhanQnA.repository.UserRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +18,7 @@ public class GoogleOauthService implements OauthService {
 
     private final RestTemplate restTemplate;
     private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
 
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId;
@@ -41,19 +43,39 @@ public class GoogleOauthService implements OauthService {
         // 2. 토큰으로 구글 사용자 정보 조회
         GoogleUserResponse googleUser = requestGoogleUserInfo(googleToken.getAccessToken());
 
-        // 3. 서버 JWT 발급 및 리프레시 토큰 저장 (필요 시 다른 계층에서 처리 가능)
-        String userIdStr = googleUser.getSub(); // Google user unique ID
+        // 3. 이메일 추출 및 유효성 검사
+        String email = googleUser.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("이메일 정보가 없습니다");
+        }
 
-        String serverAccessToken = jwtTokenProvider.createAccessToken(userIdStr);
-        String serverRefreshToken = jwtTokenProvider.createRefreshToken(userIdStr);
+        // 4. JWT 생성 (subject를 이메일로)
+        String serverAccessToken = jwtTokenProvider.createAccessToken(email);
+        String serverRefreshToken = jwtTokenProvider.createRefreshToken(email);
 
-        refreshTokenRepository.save(userIdStr, serverRefreshToken);
+        // 5. 리프레시 토큰을 DB에 저장 또는 사용자 신규 생성
+        userRepository.findByEmail(email)
+                .map(user -> {
+                    // 기존 사용자 토큰 업데이트 및 이름 업데이트
+                    user.setToken(serverRefreshToken);
+                    user.setName(googleUser.getName());
+                    return userRepository.save(user);
+                })
+                .orElseGet(() -> {
+                    // 신규 사용자 생성 및 리프레시 토큰 저장
+                    User newUser = User.builder()
+                            .email(email)
+                            .name(googleUser.getName())
+                            .token(serverRefreshToken)
+                            .build();
+                    return userRepository.save(newUser);
+                });
 
-        // 4. OauthUserInfo 변환해 반환
+        // 6. OauthUserInfo 반환: oauthId는 googleUser.getSub() 등 구글 고유 ID 사용
         return new OauthUserInfo(
                 "google",
-                userIdStr,
-                googleUser.getEmail(),
+                googleUser.getSub(),  // 고유 ID 유지
+                email,
                 googleUser.getName()
         );
     }
