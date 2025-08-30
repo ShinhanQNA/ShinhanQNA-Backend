@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
 
 import java.util.Map;
 
@@ -31,12 +34,15 @@ public class OauthController {
         logger.info("소셜 로그인 진입 – provider: {}", provider);
 
         try {
+            String decodedCode = URLDecoder.decode(code, StandardCharsets.UTF_8.name());
+            logger.info("디코딩 전 code: {}", code);
+            logger.info("디코딩 후 code: {}", decodedCode);
             logger.info("현재 등록된 OauthService 빈 목록: {}", oauthServiceMap.keySet());
 
             OauthService oauthService = getOauthService(provider);
             logger.info("getOauthService 호출 결과 – provider: {}, 서비스 클래스: {}", provider, oauthService.getClass().getSimpleName());
 
-            OauthUserInfo userInfo = oauthService.getUserInfo(code);
+            OauthUserInfo userInfo = oauthService.getUserInfo(decodedCode);
             logger.info("userInfo 반환: {}", userInfo);
 
             if (userInfo == null || userInfo.getOauthId() == null) {
@@ -45,17 +51,14 @@ public class OauthController {
                         .body(Map.of("error", "이름 없음"));
             }
 
-//            String accessToken = jwtTokenProvider.createAccessToken(userInfo.getOauthId());
-//            String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getOauthId());
-//
-//            refreshTokenRepository.save(userInfo.getOauthId(), refreshToken);
+
             if (userInfo.getEmail() == null) {
                 throw new RuntimeException("이메일 정보가 없습니다");
             }
 
             String accessToken = jwtTokenProvider.createAccessToken(userInfo.getEmail());
             String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getEmail());
-            //refreshTokenRepository.save(userInfo.getEmail(), refreshToken);
+
 
 
             int expiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
