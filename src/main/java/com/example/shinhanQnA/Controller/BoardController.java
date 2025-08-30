@@ -99,6 +99,7 @@ public class BoardController {
                     .body(Map.of("error", "토큰 인증 실패", "message", e.getMessage()));
         }
     }
+
     // 상태별 조회
     @GetMapping("/status/{status}")
     public ResponseEntity<?> getBoardsByStatus(
@@ -231,6 +232,38 @@ public class BoardController {
             return ResponseEntity.ok(report);
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("error", "신고 실패", "message", e.getMessage()));
+        }
+    }
+
+    // 내가 쓴 글 모아보기 (전체 조회)
+// GET /boards/my
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyBoards(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            String email = validateAndExtractEmail(authorizationHeader);
+            List<Map<String, Object>> boards = boardService.findMyBoards(email);
+            return ResponseEntity.ok(boards);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "인증 실패", "message", e.getMessage()));
+        }
+    }
+
+    // 내가 쓴 글 상세 조회
+// GET /boards/my/{postId}
+    @GetMapping("/my/{postId}")
+    public ResponseEntity<?> getMyBoardDetail(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable Integer postId) {
+        try {
+            String email = validateAndExtractEmail(authorizationHeader);
+            return boardService.findMyBoardDetail(postId, email)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("error", "권한 없음", "message", "본인의 글만 확인할 수 있습니다.")));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "인증 실패", "message", e.getMessage()));
         }
     }
 }

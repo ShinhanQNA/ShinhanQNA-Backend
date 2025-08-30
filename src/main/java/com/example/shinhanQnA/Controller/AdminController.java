@@ -1,6 +1,9 @@
 package com.example.shinhanQnA.Controller;
 
+import com.example.shinhanQnA.DTO.PendingUserDetailResponse;
+import com.example.shinhanQnA.DTO.PendingUserSummaryResponse;
 import com.example.shinhanQnA.DTO.TokenResponse;
+import com.example.shinhanQnA.DTO.UserWithWarningsResponse;
 import com.example.shinhanQnA.entity.Admin;
 import com.example.shinhanQnA.entity.BoardReport;
 import com.example.shinhanQnA.entity.User;
@@ -10,10 +13,12 @@ import com.example.shinhanQnA.service.BoardReportService;
 import com.example.shinhanQnA.service.UserService;
 import com.example.shinhanQnA.service.UserWarningService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.example.shinhanQnA.repository.UserRepository;
 
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -82,7 +87,16 @@ public class AdminController {
         if (!isAuthorizedAdmin(authorizationHeader)) {
             return ResponseEntity.status(403).body(Map.of("error", "관리자 권한이 없습니다."));
         }
-        return ResponseEntity.ok(userRepository.findAll());
+
+        // 모든 유저 + warnings 묶어서 반환
+        List<UserWithWarningsResponse> usersWithWarnings = userRepository.findAll().stream()
+                .map(user -> new UserWithWarningsResponse(
+                        user,
+                        userWarningService.getWarningsByEmail(user.getEmail())
+                ))
+                .toList();
+
+        return ResponseEntity.ok(usersWithWarnings);
     }
 
 
@@ -101,7 +115,10 @@ public class AdminController {
         }
 
         return userRepository.findByEmail(email)
-                .<ResponseEntity<?>>map(ResponseEntity::ok) // ★ 이 부분에 <ResponseEntity<?>> 명시
+                .<ResponseEntity<?>>map(user -> {
+                    List<userwarning> warnings = userWarningService.getWarningsByEmail(email);
+                    return ResponseEntity.ok(new UserWithWarningsResponse(user, warnings));
+                })
                 .orElseGet(() -> ResponseEntity
                         .status(404)
                         .body(Map.of("error", "해당 사용자를 찾을 수 없습니다.")));
@@ -240,7 +257,7 @@ public class AdminController {
 
         boolean certified;
         try {
-            certified = Boolean.parseBoolean(certifiedObj.toString()); // ✅ 문자열/boolean 둘 다 허용
+            certified = Boolean.parseBoolean(certifiedObj.toString());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "studentCertified 값은 true/false 여야 합니다."));
         }
@@ -255,6 +272,71 @@ public class AdminController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    // 가입 대기 사용자 전체 조회
+    @GetMapping("/pending")
+    public ResponseEntity<?> getPendingUsers(@RequestHeader("Authorization") String authorizationHeader)
+    {
+        if (!isAuthorizedAdmin(authorizationHeader)) {
+            return ResponseEntity.status(403).body(Map.of("error", "관리자 권한이 없습니다."));
+        }
+        try {
+            List<PendingUserSummaryResponse> users = userService.getPendingUsersSummary();
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "조회 실패", "message", e.getMessage()));
+        }
+    }
+
+    // 가입 대기 사용자 상세 조회
+    @GetMapping("/pending/{email}")
+    public ResponseEntity<?> getPendingUserDetail(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String email) {
+        if (!isAuthorizedAdmin(authorizationHeader)) {
+            return ResponseEntity.status(403).body(Map.of("error", "관리자 권한이 없습니다."));
+        }
+        try {
+            PendingUserDetailResponse user = userService.getPendingUserDetail(email);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "조회 실패", "message", e.getMessage()));
+        }
+    }
+
+    // 특정 유저 이메일로 해당 유저의 차단 이유 리스트를 반환하는 API (관리자 전용)
+    @PostMapping("/users/block-reasons")
+    public ResponseEntity<?> getUserBlockReasons(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody Map<String, String> payload) {
+
+
+        String email = payload.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "이메일을 입력하세요."));
+        }
+
+        // 차단 상태의 경고들만 조회
+        List<userwarning> blockWarnings = userWarningService.getWarningsByEmail(email).stream()
+                .filter(warning -> "차단".equals(warning.getStatus()))
+                .toList();
+
+        if (blockWarnings.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "해당 유저는 차단된 기록이 없습니다."));
+        }
+
+        // 차단 이유 리스트를 추출
+        List<String> reasons = blockWarnings.stream()
+                .map(userwarning::getReason)
+                .toList();
+
+        return ResponseEntity.ok(Map.of(
+                "email", email,
+                "blockReasons", reasons
+        ));
     }
 
 

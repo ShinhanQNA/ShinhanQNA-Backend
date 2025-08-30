@@ -31,5 +31,9 @@ public class UserWarningService {
     public List<userwarning> getWarningsByStatus(String status) {
         return userWarningRepository.findByStatus(status);
     }
+
+    public List<userwarning> getWarningsByEmail(String email) {
+        return userWarningRepository.findByEmail(email);
+    }
 }
 

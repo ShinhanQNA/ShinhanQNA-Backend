@@ -3,6 +3,8 @@ package com.example.shinhanQnA.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "`User`")
 @Getter @Setter
@@ -41,6 +43,14 @@ public class User {
 
     @Column(name = "student_certified", nullable = false)
     private boolean studentCertified = false;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 
 
 }

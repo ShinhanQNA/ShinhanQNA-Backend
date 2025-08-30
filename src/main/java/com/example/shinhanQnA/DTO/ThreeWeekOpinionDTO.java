@@ -1,25 +1,22 @@
 package com.example.shinhanQnA.DTO;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Data
+@Getter
+@Setter
 @Builder
-public class BoardResponseDTO {
+@AllArgsConstructor
+@NoArgsConstructor
+public class ThreeWeekOpinionDTO {
+    private Long id;
     private Integer postId;
     private String title;
     private String content;
     private Integer likes;
     private LocalDateTime date;
-    private String status;
-    private Long reportCount;
-    private String warningStatus;
-    private String writerEmail;
-
-
     private String imagePath;
+    private LocalDateTime createdAt;
 }
-
-

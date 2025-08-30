@@ -1,14 +1,20 @@
 package com.example.shinhanQnA.Controller;
 
+import com.example.shinhanQnA.DTO.PendingUserDetailResponse;
+import com.example.shinhanQnA.DTO.PendingUserSummaryResponse;
+import com.example.shinhanQnA.DTO.UserWithWarningsResponse;
 import com.example.shinhanQnA.entity.User;
+import com.example.shinhanQnA.entity.userwarning;
 import com.example.shinhanQnA.service.JwtTokenProvider;
 import com.example.shinhanQnA.service.UserService;
 import com.example.shinhanQnA.repository.UserRepository;
+import com.example.shinhanQnA.service.UserWarningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -19,6 +25,7 @@ public class UserController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final UserWarningService userWarningService;
 
     // 토큰 검증 및 이메일 추출 (예외 발생 시 RuntimeException 던짐)
     private String validateAndExtractEmail(String authorizationHeader) {
@@ -41,6 +48,7 @@ public class UserController {
             @RequestParam("department") String department,
             @RequestParam("year") Integer year,
             @RequestParam("role") String role,
+            @RequestParam("studentCertified") Boolean studentCertified,
             @RequestPart("image") MultipartFile image) {
 
         try {
@@ -54,7 +62,7 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("유효하지 않은 사용자");
             }
 
-            userService.certifyStudent(email, students, name, department, year, role, image);
+            userService.certifyStudent(email, students, name, department, year, role, studentCertified, image); // 인자 추가
             Map<String, String> response = Map.of("message", "성공");
             return ResponseEntity.ok(response);
 
@@ -91,7 +99,11 @@ public class UserController {
         try {
             String email = validateAndExtractEmail(authorizationHeader);
             User user = userService.getUserInfo(email);
-            return ResponseEntity.ok(user);
+
+            // 유저의 경고/차단 기록 가져오기
+            List<userwarning> warnings = userWarningService.getWarningsByEmail(email);
+
+            return ResponseEntity.ok(new UserWithWarningsResponse(user, warnings));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "인증 실패", "message", e.getMessage()));
@@ -120,4 +132,20 @@ public class UserController {
                     .body(Map.of("error", "상태 변경 실패", "message", e.getMessage()));
         }
     }
+
+    // DELETE /users/me
+    @DeleteMapping("/me")
+    public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            String email = validateAndExtractEmail(authorizationHeader);
+            userService.deleteUserWithRelatedData(email);
+            return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "회원 탈퇴 실패", "message", e.getMessage()));
+        }
+    }
+
+
+
 }

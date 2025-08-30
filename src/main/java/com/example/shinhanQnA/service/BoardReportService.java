@@ -15,7 +15,14 @@ public class BoardReportService {
 
     private final BoardReportRepository boardReportRepository;
 
+    @Transactional
     public BoardReport reportBoard(Integer postId, String reporterEmail, String reportReason) {
+        // 동일 게시글에 대해 동일 신고자가 이미 신고했는지 확인
+        boolean exists = boardReportRepository.existsByPostIdAndReporterEmail(postId, reporterEmail);
+        if (exists) {
+            throw new RuntimeException("이미 해당 게시글을 신고하셨습니다.");
+        }
+
         BoardReport report = BoardReport.builder()
                 .postId(postId)
                 .reporterEmail(reporterEmail)
@@ -38,4 +45,3 @@ public class BoardReportService {
         return boardReportRepository.save(report);
     }
 }
-

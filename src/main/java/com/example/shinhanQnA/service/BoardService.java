@@ -13,8 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.shinhanQnA.entity.userwarning;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -203,13 +202,10 @@ public class BoardService {
 
         return boards.stream()
                 .map(board -> {
-                    // 1. 게시글별 신고 카운트
                     Long reportCount = boardReportRepository.countByPostId(board.getPostId());
-                    // 2. 게시글 작성자의 최신 userwarning 상태 찾기
-                    String writerEmail = board.getEmail();
-                    String warningStatus = userWarningRepository.findTopByEmailOrderByWarningDateDesc(writerEmail)
-                            .map(userWarning -> userWarning.getStatus())
-                            .orElse("없음"); // warning 존재 X
+                    String warningStatus = userWarningRepository.findTopByEmailOrderByWarningDateDesc(board.getEmail())
+                            .map(userwarning::getStatus)
+                            .orElse("없음");
 
                     return BoardResponseDTO.builder()
                             .postId(board.getPostId())
@@ -220,6 +216,8 @@ public class BoardService {
                             .status(board.getStatus())
                             .reportCount(reportCount)
                             .warningStatus(warningStatus)
+                            .writerEmail(board.getEmail())
+                            .imagePath(board.getImagePath() == null ? null : board.getImagePath())
                             .build();
                 })
                 .toList();
@@ -234,6 +232,7 @@ public class BoardService {
                             .findTopByEmailOrderByWarningDateDesc(board.getEmail())
                             .map(userwarning::getStatus)
                             .orElse("없음");
+
                     return BoardResponseDTO.builder()
                             .postId(board.getPostId())
                             .title(board.getTitle())
@@ -244,8 +243,40 @@ public class BoardService {
                             .reportCount(reportCount)
                             .warningStatus(warningStatus)
                             .writerEmail(board.getEmail())
-                            .imagePath(board.getImagePath())
+                            .imagePath(board.getImagePath() == null ? null : board.getImagePath())
                             .build();
+                });
+    }
+
+    // 내가 쓴 글 전체 조회
+    public List<Map<String, Object>> findMyBoards(String email) {
+        List<Board> boards = boardRepository.findByEmailOrderByDateDesc(email);
+
+        return boards.stream()
+                .map(board -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("postId", board.getPostId());
+                    map.put("email", board.getEmail());
+                    map.put("title", board.getTitle());
+                    map.put("content", board.getContent());
+                    return map;
+                })
+                .toList();
+    }
+
+    // 내가 쓴 글 상세 조회
+    public Optional<Map<String, Object>> findMyBoardDetail(Integer postId, String email) {
+        return boardRepository.findById(postId)
+                .filter(board -> board.getEmail().equals(email))
+                .map(board -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("postId", board.getPostId());
+                    map.put("email", board.getEmail());
+                    map.put("title", board.getTitle());
+                    map.put("content", board.getContent());
+                    map.put("imagePath", board.getImagePath()); // null이어도 정상 동작
+                    map.put("likes", board.getLikes());
+                    return map;
                 });
     }
 
