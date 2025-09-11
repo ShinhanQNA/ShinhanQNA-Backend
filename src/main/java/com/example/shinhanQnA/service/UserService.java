@@ -1,11 +1,14 @@
 package com.example.shinhanQnA.service;
 
 
+import com.example.shinhanQnA.Controller.OauthController;
 import com.example.shinhanQnA.DTO.PendingUserDetailResponse;
 import com.example.shinhanQnA.DTO.PendingUserSummaryResponse;
 import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +25,8 @@ public class UserService {
     private final BoardRepository boardRepository;
     private final BoardReportRepository boardReportRepository;
     private final LikeRepository likeRepository;
+
+    private static final Logger logger = LoggerFactory.getLogger(OauthController.class);
 
     @Transactional
     public User certifyStudent(String email, Integer students, String name, String department, Integer year, String role, Boolean studentCertified, MultipartFile image) {
@@ -49,9 +54,12 @@ public class UserService {
 
     // 사용자 정보 + 가입 상태 조회
     public User getUserInfo(String email) {
-        return userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + email));
+        logger.info("[UserService] 조회 사용자 상태: {}", user.getStatus());
+        return user;
     }
+
 
     // 가입 상태 변경 및 저장
     @Transactional
@@ -114,4 +122,13 @@ public class UserService {
         return PendingUserDetailResponse.fromEntity(user);
     }
 
+    @Transactional
+    public User saveUser(User user) {
+        logger.info("[UserService] 저장 전 상태: {}", user.getStatus());
+        User savedUser = userRepository.save(user);
+        logger.info("[UserService] 저장 후 상태: {}", savedUser.getStatus());
+        return savedUser;
     }
+
+
+}

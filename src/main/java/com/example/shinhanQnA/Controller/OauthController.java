@@ -2,8 +2,10 @@ package com.example.shinhanQnA.Controller;
 
 import com.example.shinhanQnA.DTO.TokenResponse;
 import com.example.shinhanQnA.DTO.OauthUserInfo;
+import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.service.JwtTokenProvider;
 import com.example.shinhanQnA.service.OauthService;
+import com.example.shinhanQnA.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,8 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-
-
 import java.util.Map;
 
 @RestController
@@ -24,7 +24,7 @@ public class OauthController {
 
     private final Map<String, OauthService> oauthServiceMap;
     private final JwtTokenProvider jwtTokenProvider;
-
+    private final UserService userService;
 
     @PostMapping("/oauth/callback/{provider}")
     public ResponseEntity<?> socialCallback(
@@ -51,15 +51,29 @@ public class OauthController {
                         .body(Map.of("error", "이름 없음"));
             }
 
-
             if (userInfo.getEmail() == null) {
                 throw new RuntimeException("이메일 정보가 없습니다");
             }
 
-            String accessToken = jwtTokenProvider.createAccessToken(userInfo.getEmail());
-            String refreshToken = jwtTokenProvider.createRefreshToken(userInfo.getEmail());
+            // 사용자 존재 여부 확인 및 신규 생성
+            User user;
+            try {
+                user = userService.getUserInfo(userInfo.getEmail());
+                if (user.getStatus() == null) {
+                    user.setStatus("가입 대기 중");
+                    userService.saveUser(user);
+                }
+            } catch (RuntimeException e) {
+                user = new User();
+                user.setEmail(userInfo.getEmail());
+                user.setName(userInfo.getNickname());
+                user.setStatus("가입 대기 중");  // 기본 상태 지정
+                logger.info("[OauthController] 신규 사용자 생성 직후 상태: {}", user.getStatus());
+                userService.saveUser(user);
+            }
 
-
+            String accessToken = jwtTokenProvider.createAccessToken(user.getEmail());
+            String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail());
 
             int expiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
 
@@ -79,7 +93,7 @@ public class OauthController {
     }
 
     private OauthService getOauthService(String provider) {
-        String trimmedProvider = provider.trim();  // 앞뒤 공백/개행 제거
+        String trimmedProvider = provider.trim();  // 앞뒤 공백 제거
         String beanName = trimmedProvider.toLowerCase() + "OauthService";
 
         logger.info("getOauthService – 요청된 beanName: '{}'", beanName);
@@ -95,5 +109,4 @@ public class OauthController {
         }
         return oauthService;
     }
-
 }
