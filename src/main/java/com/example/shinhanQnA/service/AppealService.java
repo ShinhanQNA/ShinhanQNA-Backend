@@ -88,5 +88,13 @@ public class AppealService {
         return appealRepository.findByStatusOrderByCreatedAtDesc("대기");
     }
 
+    public Appeal getAppealByEmail(String email) {
+        return appealRepository.findByEmail(email)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("해당 이메일에 이의제기가 존재하지 않습니다."));
+    }
+
+
 }
 
