@@ -10,4 +10,5 @@ public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findByEmail(String email);
     List<User> findAllByStatus(String status);
     List<User> findAllByStatusOrderByCreatedAtDesc(String status);
+    List<User> findByStudentCertifiedTrue();
 }

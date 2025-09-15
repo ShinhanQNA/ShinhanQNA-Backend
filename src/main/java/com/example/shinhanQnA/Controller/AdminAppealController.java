@@ -1,5 +1,7 @@
 package com.example.shinhanQnA.Controller;
 
+import com.example.shinhanQnA.DTO.AppealDetailResponse;
+import com.example.shinhanQnA.DTO.AppealSummaryResponse;
 import com.example.shinhanQnA.entity.Appeal;
 import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.service.*;
@@ -37,18 +39,10 @@ public class AdminAppealController {
             return ResponseEntity.status(403).body(Map.of("error", "관리자 권한이 없습니다."));
         }
 
-        // 최신순 정렬된 이의제기 목록 가져오기 (서비스에서 정렬 보장)
-        List<Map<String, Object>> response = appealService.getAllPendingAppealsSortedByDate().stream()
+        List<AppealSummaryResponse> response = appealService.getAllPendingAppealsSortedByDate().stream()
                 .map(appeal -> {
                     User user = userService.getUserInfo(appeal.getEmail());
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("id", appeal.getId());
-                    map.put("name", user.getName());
-                    map.put("students", user.getStudents());
-                    map.put("year", user.getYear());
-                    map.put("department", user.getDepartment());
-                    map.put("createdAt", appeal.getCreatedAt());
-                    return map;
+                    return AppealSummaryResponse.fromEntity(appeal, user);
                 })
                 .toList();
 
@@ -65,18 +59,13 @@ public class AdminAppealController {
 
         try {
             User user = userService.getUserInfo(email);
+            Appeal appeal = appealService.getAppealByEmail(email);  // 이메일로 이의제기 조회 메서드 필요
+
             List<?> boards = boardService.findAllBoardsWithUserWarning().stream()
                     .filter(b -> b.getWriterEmail().equals(email))
                     .toList();
 
-            return ResponseEntity.ok(Map.of(
-                    "id", user.getEmail(),
-                    "name", user.getName(),
-                    "students", user.getStudents(),
-                    "year", user.getYear(),
-                    "department", user.getDepartment(),
-                    "boards", boards
-            ));
+            return ResponseEntity.ok(AppealDetailResponse.of(appeal, user, boards));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

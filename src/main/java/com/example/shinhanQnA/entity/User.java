@@ -8,10 +8,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "`User`")
 @Getter @Setter
-@NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class User {
+
+    public User() {
+        this.status = "가입 대기 중";
+    }
 
     @Id
     @Column(name = "Email", length = 255)
