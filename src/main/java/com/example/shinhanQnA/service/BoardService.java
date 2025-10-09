@@ -148,7 +148,19 @@ public class BoardService {
         return board;
     }
 
+    @Transactional
     public void deleteBoard(Integer postId) {
+        // 게시글 존재 여부 확인
+        Board board = boardRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("게시글을 찾을 수 없습니다."));
+
+        // 1. 해당 게시글의 좋아요 데이터 먼저 삭제 (외래키 제약조건 해결)
+        likeRepository.deleteByPostId(postId);
+
+        // 2. 해당 게시글의 신고 데이터 삭제
+        boardReportRepository.deleteAllByPostIdIn(List.of(postId));
+
+        // 3. 게시글 삭제
         boardRepository.deleteById(postId);
     }
 
@@ -280,4 +292,21 @@ public class BoardService {
                 });
     }
 
+    // 특정 사용자의 신고된 게시글을 자동 삭제하는 메서드
+    @Transactional
+    public void deleteReportedBoardsByUser(String email) {
+        // 해당 사용자가 작성한 게시글 중 신고받은 게시글 ID 조회
+        List<Integer> reportedPostIds = boardReportRepository.findReportedPostIdsByWriterEmail(email);
+
+        if (!reportedPostIds.isEmpty()) {
+            // 1. 신고받은 게시글들의 좋아요 데이터 먼저 삭제 (외래키 제약조건 해결)
+            likeRepository.deleteAllByPostIdIn(reportedPostIds);
+
+            // 2. 해당 게시글들의 신고 기록 삭제
+            boardReportRepository.deleteByPostIdIn(reportedPostIds);
+
+            // 3. 신고받은 게시글들 삭제
+            boardRepository.deleteAllById(reportedPostIds);
+        }
+    }
 }

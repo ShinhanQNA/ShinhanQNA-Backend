@@ -62,9 +62,9 @@ public class AdminService {
             throw new RuntimeException("비활성화된 관리자 계정입니다.");
         }
 
-        // 토큰 생성
-        String accessToken = jwtTokenProvider.createAccessToken(admin.getId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(admin.getId());
+        // 관리자 전용 토큰 생성
+        String accessToken = jwtTokenProvider.createAdminAccessToken(admin.getId());
+        String refreshToken = jwtTokenProvider.createAdminRefreshToken(admin.getId());
         int expiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
 
 
@@ -81,9 +81,14 @@ public class AdminService {
     public TokenResponse reissueAccessToken(String refreshToken) {
         logger.info("Access Token 재발급 요청");
 
-
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new RuntimeException("유효하지 않은 Refresh Token 입니다.");
+        }
+
+        // 리프레시 토큰에서 역할 정보 추출
+        String role = jwtTokenProvider.getRoleFromToken(refreshToken);
+        if (!"ADMIN".equals(role)) {
+            throw new RuntimeException("관리자 권한이 없는 토큰입니다.");
         }
 
         String adminId = jwtTokenProvider.getEmailFromToken(refreshToken);
@@ -91,15 +96,15 @@ public class AdminService {
         Admin admin = adminRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("관리자 계정을 찾을 수 없습니다."));
 
-
         if (!refreshToken.equals(admin.getRefreshToken())) {
             throw new RuntimeException("Refresh Token 정보가 일치하지 않습니다.");
         }
 
-        String newAccessToken = jwtTokenProvider.createAccessToken(adminId);
+        // 관리자 전용 액세스 토큰 재발급 (역할 정보 유지)
+        String newAccessToken = jwtTokenProvider.createAdminAccessToken(adminId);
         int expiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
 
-        logger.info("Access Token 재발급 성공: id={}", adminId);
+        logger.info("Access Token 재발급 성공: id={}, role={}", adminId, role);
 
         return new TokenResponse(newAccessToken, refreshToken, expiresIn);
     }
@@ -112,14 +117,9 @@ public class AdminService {
         return userRepository.save(user);
     }
 
+    // 개선된 관리자 토큰 판별 메서드 (DB 조회 없이 토큰 자체에서 판별)
     public boolean isValidAdminToken(String token) {
-        if (!jwtTokenProvider.validateToken(token)) {
-            return false;
-        }
-        String adminId = jwtTokenProvider.getEmailFromToken(token);
-        return adminRepository.findById(adminId)
-                .map(admin -> "ADMIN".equals(admin.getRole()))
-                .orElse(false);
+        return jwtTokenProvider.isAdminToken(token);
     }
 
     // 학생 인증 유무
@@ -143,7 +143,9 @@ public class AdminService {
         return userRepository.save(user);
     }
 
-
-
-
+    // 관리자 정보 조회 메서드 추가
+    public Admin getAdminInfo(String adminId) {
+        return adminRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("관리자 정보를 찾을 수 없습니다."));
+    }
 }

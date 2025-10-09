@@ -5,7 +5,10 @@ import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.repository.AppealRepository;
 import com.example.shinhanQnA.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,8 +17,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AppealService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AppealService.class);
+
     private final AppealRepository appealRepository;
     private final UserRepository userRepository;
+    private final UserWarningService userWarningService;
 
     // 사용자 이의제기 신청
     public Appeal submitAppeal(String email) {
@@ -55,6 +61,7 @@ public class AppealService {
      * @param newStatus "승인" 또는 "거절"
      * @return 업데이트 된 Appeal 객체
      */
+    @Transactional
     public Appeal updateAppealStatusAndSyncUser(Long appealId, String newStatus) {
         Appeal appeal = appealRepository.findById(appealId)
                 .orElseThrow(() -> new RuntimeException("해당 이의제기를 찾을 수 없습니다."));
@@ -62,9 +69,6 @@ public class AppealService {
         if (!newStatus.equals("승인") && !newStatus.equals("거절")) {
             throw new RuntimeException("이의제기 상태는 '승인' 또는 '거절'만 가능합니다.");
         }
-
-        appeal.setStatus(newStatus);
-        appealRepository.save(appeal);
 
         User user = userRepository.findByEmail(appeal.getEmail())
                 .orElseThrow(() -> new RuntimeException("해당 사용자를 찾을 수 없습니다."));
@@ -74,10 +78,26 @@ public class AppealService {
             if ("차단".equals(user.getStatus())) {
                 user.setStatus("가입 완료");
                 userRepository.save(user);
+
+                // 해당 유저의 모든 경고/차단 정보 삭제
+                userWarningService.deleteAllWarningsByEmail(appeal.getEmail());
+                logger.info("이의제기 승인으로 인한 유저 {} 경고/차단 이력 삭제 완료", appeal.getEmail());
+
+                // 이의제기 정보 삭제 (전체 이의제기 조회에서 제외)
+                appealRepository.delete(appeal);
+                logger.info("이의제기 승인으로 인한 appeal {} 삭제 완료", appealId);
+
+                return appeal; // 삭제되기 전 정보 반환
             }
         } else if (newStatus.equals("거절")) {
-            // 이의제기 거절시 유저 상태 그대로 유지(차단 상태 유지)
-            // 별도 작업 필요 없음
+            // 이의제기 거절시 차단 -> 완전 차단 상태로 변경
+            if ("차단".equals(user.getStatus())) {
+                user.setStatus("완전 차단");
+                userRepository.save(user);
+                logger.info("이의제기 거절으로 인한 유저 {} 상태 변경: 차단 -> 완전 차단", appeal.getEmail());
+            }
+            appeal.setStatus(newStatus);
+            appealRepository.save(appeal);
         }
 
         return appeal;
@@ -97,4 +117,3 @@ public class AppealService {
 
 
 }
-

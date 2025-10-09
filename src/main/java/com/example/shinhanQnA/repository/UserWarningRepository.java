@@ -16,5 +16,7 @@ public interface UserWarningRepository extends JpaRepository<userwarning, Long> 
     @Modifying
     @Transactional
     void deleteAllByEmail(String email);
+    @Modifying
+    @Transactional
+    void deleteByEmail(String email);
 }
-

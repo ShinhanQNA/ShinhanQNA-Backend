@@ -44,4 +44,12 @@ public class BoardReportService {
         report.setResolved(resolved);
         return boardReportRepository.save(report);
     }
+
+    // 신고 게시글 반려 (신고 삭제)
+    @Transactional
+    public void rejectReport(Long reportId) {
+        BoardReport report = boardReportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("해당 신고 내역을 찾을 수 없습니다."));
+        boardReportRepository.delete(report);
+    }
 }

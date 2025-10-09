@@ -139,21 +139,35 @@ public class ThreeWeekOpinionController {
         return ResponseEntity.ok(dtos);
     }
 
-    @PostMapping("/select/full-month")
-    public ResponseEntity<?> selectFullMonthGroupAndSave(
+    /** 테스트용 - 수동으로 특정 년/월에 대해 3주 조회 게시글 생성
+     *  POST /three-week-opinions/manual-create?year=YYYY&month=MM
+     *  관리자 토큰만 허용
+     */
+    @PostMapping("/manual-create")
+    public ResponseEntity<?> manualCreateThreeWeekOpinion(
             @RequestHeader("Authorization") String authorizationHeader,
             @RequestParam int year,
             @RequestParam int month) {
 
-        validateAndExtractEmail(authorizationHeader);
+        if (!isAdmin(authorizationHeader)) {
+            return ResponseEntity.status(403).body(Map.of("error", "관리자 권한이 필요합니다."));
+        }
 
-        ThreeWeekOpinionGroup group = service.createOrGetFullMonthGroup(year, month);
+        try {
+            ThreeWeekOpinionGroup group = service.createOrGetGroup(year, month);
+            List<ThreeWeekOpinion> opinions = service.saveOpinionsForGroup(group);
 
-        return ResponseEntity.ok(Map.of(
-                "groupId", group.getId(),
-                "responseStatus", group.getResponseStatus()
-        ));
+            return ResponseEntity.ok(Map.of(
+                    "message", "3주 조회 게시글이 수동으로 생성되었습니다.",
+                    "year", year,
+                    "month", month,
+                    "groupId", group.getId(),
+                    "selectedCount", opinions.size(),
+                    "responseStatus", group.getResponseStatus()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "생성 중 오류가 발생했습니다: " + e.getMessage()));
+        }
     }
-
 
 }
