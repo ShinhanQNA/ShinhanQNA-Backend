@@ -3,8 +3,10 @@ package com.example.shinhanQnA.Controller;
 import com.example.shinhanQnA.DTO.PendingUserDetailResponse;
 import com.example.shinhanQnA.DTO.PendingUserSummaryResponse;
 import com.example.shinhanQnA.DTO.UserWithWarningsResponse;
+import com.example.shinhanQnA.entity.Admin;
 import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.entity.userwarning;
+import com.example.shinhanQnA.service.AdminService;
 import com.example.shinhanQnA.service.JwtTokenProvider;
 import com.example.shinhanQnA.service.UserService;
 import com.example.shinhanQnA.repository.UserRepository;
@@ -26,6 +28,7 @@ public class UserController {
     private final UserService userService;
     private final UserRepository userRepository;
     private final UserWarningService userWarningService;
+    private final AdminService adminService;
 
     // 토큰 검증 및 이메일 추출 (예외 발생 시 RuntimeException 던짐)
     private String validateAndExtractEmail(String authorizationHeader) {
@@ -98,12 +101,19 @@ public class UserController {
     public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String authorizationHeader) {
         try {
             String email = validateAndExtractEmail(authorizationHeader);
-            User user = userService.getUserInfo(email);
 
-            // 유저의 경고/차단 기록 가져오기
-            List<userwarning> warnings = userWarningService.getWarningsByEmail(email);
-
-            return ResponseEntity.ok(new UserWithWarningsResponse(user, warnings));
+            // 관리자 토큰인지 확인
+            String token = authorizationHeader.substring(7);
+            if (adminService.isValidAdminToken(token)) {
+                // 관리자 정보 반환
+                Admin admin = adminService.getAdminInfo(email);
+                return ResponseEntity.ok(admin);
+            } else {
+                // 일반 사용자 정보 반환
+                User user = userService.getUserInfo(email);
+                List<userwarning> warnings = userWarningService.getWarningsByEmail(email);
+                return ResponseEntity.ok(new UserWithWarningsResponse(user, warnings));
+            }
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "인증 실패", "message", e.getMessage()));

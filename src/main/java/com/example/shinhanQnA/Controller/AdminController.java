@@ -10,6 +10,7 @@ import com.example.shinhanQnA.entity.User;
 import com.example.shinhanQnA.entity.userwarning;
 import com.example.shinhanQnA.service.AdminService;
 import com.example.shinhanQnA.service.BoardReportService;
+import com.example.shinhanQnA.service.BoardService;
 import com.example.shinhanQnA.service.UserService;
 import com.example.shinhanQnA.service.UserWarningService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class AdminController {
     private final UserService userService;
     private final UserWarningService userWarningService;
     private final BoardReportService boardReportService;
+    private final BoardService boardService;
 
     @PostMapping("/login")
     public ResponseEntity<?> adminLogin(@RequestBody Map<String, String> loginRequest) {
@@ -167,7 +169,7 @@ public class AdminController {
         return ResponseEntity.ok(boardReportService.getAllReports());
     }
 
-    // 유저 경고 및 차단 API (관리자 전용)
+    // 유저 경고 및 차단 API (관리자 전용) - 신고된 게시글 자동 삭제 기능 추가
     @PostMapping("/users/warning")
     public ResponseEntity<?> warnOrBlockUser(
             @RequestHeader("Authorization") String authorizationHeader,
@@ -190,13 +192,28 @@ public class AdminController {
             return ResponseEntity.ok(Map.of("message", "이미 경고된 사용자 입니다."));
         }
 
-        userwarning userWarning = userWarningService.addWarningOrBlock(email, status, reason);
+        try {
+            // 경고/차단 처리
+            userwarning userWarning = userWarningService.addWarningOrBlock(email, status, reason);
 
-        if (status.equals("차단")) {
-            userService.blockUser(email);
+            if (status.equals("차단")) {
+                userService.blockUser(email);
+            }
+
+            // 해당 사용자가 작성한 신고된 게시글 자동 삭제
+            boardService.deleteReportedBoardsByUser(email);
+
+            logger.info("사용자 {}에 대한 {} 처리 완료 및 신고된 게시글 자동 삭제 완료", email, status);
+
+            return ResponseEntity.ok(Map.of(
+                    "userWarning", userWarning,
+                    "message", status + " 처리가 완료되었으며, 해당 사용자의 신고된 게시글이 자동으로 삭제되었습니다."
+            ));
+        } catch (Exception e) {
+            logger.error("경고/차단 처리 중 오류 발생: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "처리 중 오류가 발생했습니다.", "message", e.getMessage()));
         }
-
-        return ResponseEntity.ok(userWarning);
     }
 
     // 신고 처리 여부 수정 API
@@ -220,6 +237,32 @@ public class AdminController {
             return ResponseEntity.ok(updatedReport);
         } catch (RuntimeException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // 신고 게시글 반려 API (신고 삭제)
+    @DeleteMapping("/boards/reports/reject")
+    public ResponseEntity<?> rejectReport(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody Map<String, Long> payload) {
+
+        if (!isAuthorizedAdmin(authorizationHeader)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "관리자 권한이 없습니다."));
+        }
+
+        Long reportId = payload.get("reportId");
+        if (reportId == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "reportId는 필수입니다."));
+        }
+
+        try {
+            boardReportService.rejectReport(reportId);
+            return ResponseEntity.ok(Map.of("message", "신고가 성공적으로 반려되었습니다."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -341,5 +384,3 @@ public class AdminController {
 
 
 }
-
-

@@ -15,10 +15,13 @@ public interface LikeRepository extends JpaRepository<LikeEntity, Long> {
 
     @Modifying
     @Transactional
+    void deleteByPostId(Integer postId);
+
+    @Modifying
+    @Transactional
     void deleteAllByPostIdIn(List<Integer> postIds);
 
     @Modifying
     @Transactional
     void deleteAllByUserEmail(String userEmail);
 }
-

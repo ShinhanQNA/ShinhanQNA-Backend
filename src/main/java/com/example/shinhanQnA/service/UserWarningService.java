@@ -35,5 +35,9 @@ public class UserWarningService {
     public List<userwarning> getWarningsByEmail(String email) {
         return userWarningRepository.findByEmail(email);
     }
-}
 
+    // 특정 유저의 모든 경고/차단 정보 삭제 (이의제기 승인 시 사용)
+    public void deleteAllWarningsByEmail(String email) {
+        userWarningRepository.deleteAllByEmail(email);
+    }
+}

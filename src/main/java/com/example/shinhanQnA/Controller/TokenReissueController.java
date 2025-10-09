@@ -51,16 +51,16 @@ public class TokenReissueController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            // 새 토큰 발급
-            String newAccessToken = jwtTokenProvider.createAccessToken(subjectId);
-            String newRefreshToken = jwtTokenProvider.createRefreshToken(subjectId);
+            // 새 어드민 토큰 발급 (role=ADMIN 유지)
+            String newAccessToken = jwtTokenProvider.createAdminAccessToken(subjectId);
+            String newRefreshToken = jwtTokenProvider.createAdminRefreshToken(subjectId);
             int newExpiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
 
             // DB에 새 refresh token 저장
             admin.setRefreshToken(newRefreshToken);
             adminRepository.save(admin);
 
-            logger.info("어드민 토큰 재발급 완료 (id: {})", subjectId);
+            logger.info("어드민 토큰 재발급 완료 (id: {}, role: ADMIN)", subjectId);
             return ResponseEntity.ok(new TokenResponse(newAccessToken, newRefreshToken, newExpiresIn));
         }
 
@@ -74,7 +74,7 @@ public class TokenReissueController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            // 새 토큰 발급
+            // 새 유저 토큰 발급 (role=USER)
             String newAccessToken = jwtTokenProvider.createAccessToken(subjectId);
             String newRefreshToken = jwtTokenProvider.createRefreshToken(subjectId);
             int newExpiresIn = jwtTokenProvider.getAccessTokenValidTimeSeconds();
@@ -82,7 +82,7 @@ public class TokenReissueController {
             user.setToken(newRefreshToken);
             userRepository.save(user);
 
-            logger.info("유저 토큰 재발급 완료 (email: {})", subjectId);
+            logger.info("유저 토큰 재발급 완료 (email: {}, role: USER)", subjectId);
             return ResponseEntity.ok(new TokenResponse(newAccessToken, newRefreshToken, newExpiresIn));
         }
 
